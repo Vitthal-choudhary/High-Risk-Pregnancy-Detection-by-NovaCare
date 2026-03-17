@@ -74,19 +74,19 @@ The model also predicts three specific comorbidity risks in parallel:
 NovaCare is fully explainable. Below are the SHAP visualizations produced by the CatBoost Referral Model:
 
 ### Feature Importance — Global Overview
-![SHAP Features](Graphs/SHAP%20Features.jpeg)
+![SHAP Features](Catboost-Model/SHAP%20Features.jpeg)
 *Global feature importance: urine protein, blood pressure, and glucose are the dominant risk drivers.*
 
 ### SHAP Summary — CatBoost Referral Model
-![SHAP Summary](Graphs/SHAP%20Summary-CatBoost%20Referral%20Model.jpeg)
+![SHAP Summary](Catboost-Model/SHAP%20Summary-CatBoost%20Referral%20Model.jpeg)
 *Full SHAP beeswarm plot showing how each feature value (color = magnitude) pushes the prediction toward high or low risk.*
 
 ### High-Risk Case Breakdown
-![SHAP High Risk](Graphs/SHAP%20High%20Risk.jpeg)
+![SHAP High Risk](Catboost-Model/SHAP%20High%20Risk.jpeg)
 *SHAP waterfall for a high-risk patient — proteinuria (4+) and hypertension dominate the positive contribution.*
 
 ### Low-Risk Case Breakdown
-![SHAP Low Risk](Graphs/SHAP%20low%20Risk.jpeg)
+![SHAP Low Risk](Catboost-Model/SHAP%20low%20Risk.jpeg)
 *SHAP waterfall for a low-risk patient — normal vitals and lab values push the score toward the safe zone.*
 
 ---
@@ -96,11 +96,11 @@ NovaCare is fully explainable. Below are the SHAP visualizations produced by the
 UMAP dimensionality reduction reveals the natural clustering structure in the patient population:
 
 ### 2D Patient Population Map
-![UMAP Projection](Graphs/UMAP%20Projection.jpeg)
+![UMAP Projection](Catboost-Model/UMAP%20Projection.jpeg)
 *All patients projected onto 2D space — three distinct clusters emerge, matching the three risk categories.*
 
 ### High-Risk Density Map
-![UMAP High-Risk Density](Graphs/UMAP%20High-Risk%20Density%20Map.jpeg)
+![UMAP High-Risk Density](Catboost-Model/UMAP%20High-Risk%20Density%20Map.jpeg)
 *Kernel density overlay highlighting where high-risk patients concentrate in feature space.*
 
 ---
