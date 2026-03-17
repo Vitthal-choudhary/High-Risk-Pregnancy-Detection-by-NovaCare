@@ -2,12 +2,23 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useCallback } from "react";
-import { Upload, FileText, CheckCircle, X, Loader2 } from "lucide-react";
+import { Upload, FileText, CheckCircle, X, Loader2, AlertCircle } from "lucide-react";
 import { GlowButton } from "@/components/ui/GlowButton";
 import { useRouter } from "next/navigation";
+import { parseFile } from "@/lib/parser";
 import clsx from "clsx";
 
 type UploadState = "idle" | "dragging" | "uploading" | "success" | "error";
+
+const ACCEPTED = ".pdf,.csv,.json";
+
+function isAccepted(file: File) {
+  return (
+    file.type === "application/pdf" ||
+    file.name.endsWith(".csv") ||
+    file.name.endsWith(".json")
+  );
+}
 
 function FilePreview({ file, onRemove }: { file: File; onRemove: () => void }) {
   const sizeKB = (file.size / 1024).toFixed(1);
@@ -38,30 +49,35 @@ export function DropZone() {
   const router = useRouter();
   const [state, setState] = useState<UploadState>("idle");
   const [files, setFiles] = useState<File[]>([]);
+  const [errorMsg, setErrorMsg] = useState<string>("");
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setState("idle");
-    const dropped = Array.from(e.dataTransfer.files).filter(
-      (f) => f.type === "application/pdf" || f.name.endsWith(".csv")
-    );
+    const dropped = Array.from(e.dataTransfer.files).filter(isAccepted);
     if (dropped.length) setFiles((prev) => [...prev, ...dropped]);
   }, []);
 
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
-    const picked = Array.from(e.target.files);
-    setFiles((prev) => [...prev, ...picked]);
+    setFiles((prev) => [...prev, ...Array.from(e.target.files!)]);
   };
 
   const handleAnalyze = async () => {
     if (!files.length) return;
     setState("uploading");
-    // Simulate processing
-    await new Promise((r) => setTimeout(r, 2000));
-    setState("success");
-    await new Promise((r) => setTimeout(r, 700));
-    router.push("/results");
+    setErrorMsg("");
+    try {
+      const result = await parseFile(files[0]);
+      sessionStorage.setItem("prenatalAnalysis", JSON.stringify(result));
+      setState("success");
+      await new Promise((r) => setTimeout(r, 600));
+      router.push("/results");
+    } catch (err) {
+      console.error(err);
+      setErrorMsg("Failed to parse file. Please check the format and try again.");
+      setState("error");
+    }
   };
 
   const isDragging = state === "dragging";
@@ -89,12 +105,11 @@ export function DropZone() {
         <input
           type="file"
           multiple
-          accept=".pdf,.csv"
+          accept={ACCEPTED}
           className="sr-only"
           onChange={handleFileInput}
         />
 
-        {/* Animated icon */}
         <motion.div
           animate={isDragging ? { scale: 1.3, y: -8 } : { scale: 1, y: 0 }}
           transition={{ type: "spring", stiffness: 300 }}
@@ -125,18 +140,15 @@ export function DropZone() {
           or <span className="text-cyan-400 underline">browse files</span>
         </p>
         <p className="text-slate-600 text-xs mt-3">
-          Supports PDF reports and CSV lab data
+          Supports PDF reports, CSV lab data, and JSON patient records
         </p>
 
-        {/* Animated border glow on drag */}
         {isDragging && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             className="absolute inset-0 rounded-2xl pointer-events-none"
-            style={{
-              boxShadow: "inset 0 0 40px rgba(34,211,238,0.1)",
-            }}
+            style={{ boxShadow: "inset 0 0 40px rgba(34,211,238,0.1)" }}
           />
         )}
       </motion.label>
@@ -150,6 +162,21 @@ export function DropZone() {
             onRemove={() => setFiles((prev) => prev.filter((_, idx) => idx !== i))}
           />
         ))}
+      </AnimatePresence>
+
+      {/* Error message */}
+      <AnimatePresence>
+        {state === "error" && errorMsg && (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            className="rounded-lg border border-red-500/30 bg-red-500/5 px-4 py-3 flex gap-2 items-start"
+          >
+            <AlertCircle size={16} className="text-red-400 shrink-0 mt-0.5" />
+            <p className="text-red-300 text-sm">{errorMsg}</p>
+          </motion.div>
+        )}
       </AnimatePresence>
 
       {/* Analyze button */}
@@ -179,7 +206,9 @@ export function DropZone() {
                   Analysis Complete!
                 </>
               ) : (
-                <>Analyze {files.length} File{files.length > 1 ? "s" : ""}</>
+                <>
+                  Analyze {files.length} File{files.length > 1 ? "s" : ""}
+                </>
               )}
             </GlowButton>
           </motion.div>

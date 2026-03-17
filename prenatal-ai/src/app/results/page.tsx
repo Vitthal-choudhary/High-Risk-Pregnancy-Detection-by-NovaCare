@@ -1,10 +1,12 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Navbar } from "@/components/landing/Navbar";
 import { RiskGauge } from "@/components/results/RiskGauge";
 import { MetricCard } from "@/components/results/MetricCard";
 import { RiskRadar, RiskBarChart } from "@/components/results/RiskChart";
+import { ReasonCard } from "@/components/results/ReasonCard";
 import { GlowButton } from "@/components/ui/GlowButton";
 import {
   Activity,
@@ -18,82 +20,151 @@ import {
   AlertTriangle,
   CheckCircle,
   Info,
+  User,
 } from "lucide-react";
+import type { AnalysisResult } from "@/types/patient";
+import { analyzeRisk } from "@/lib/analyzer";
+import { highRiskData } from "@/lib/mockData";
 
-const metrics = [
-  {
-    label: "Blood Pressure",
-    value: "142/91",
-    unit: "mmHg",
-    normal: "< 120/80",
-    risk: "high" as const,
-    icon: Activity,
-    delay: 0,
-  },
-  {
-    label: "Blood Glucose",
-    value: 126,
-    unit: "mg/dL",
-    normal: "70–99",
-    risk: "moderate" as const,
-    icon: Droplets,
-    delay: 0.06,
-  },
-  {
-    label: "BMI",
-    value: 27.4,
-    unit: "kg/m²",
-    normal: "18.5–24.9",
-    risk: "moderate" as const,
-    icon: Weight,
-    delay: 0.12,
-  },
-  {
-    label: "Hemoglobin",
-    value: 11.2,
-    unit: "g/dL",
-    normal: "> 11.0",
-    risk: "low" as const,
-    icon: Thermometer,
-    delay: 0.18,
-  },
-  {
-    label: "Urine Protein",
-    value: "2+",
-    unit: "",
-    normal: "Negative",
-    risk: "high" as const,
-    icon: TestTube,
-    delay: 0.24,
-  },
-  {
-    label: "Fetal Heart Rate",
-    value: 152,
-    unit: "bpm",
-    normal: "110–160",
-    risk: "low" as const,
-    icon: Heart,
-    delay: 0.3,
-  },
-];
+// ── Fallback result (used when no sessionStorage data exists) ─────────
+const fallbackResult: AnalysisResult = analyzeRisk(highRiskData);
 
-const recommendations = [
-  {
-    type: "high" as const,
-    icon: AlertTriangle,
-    text: "Elevated blood pressure (142/91 mmHg) and proteinuria (2+) indicate possible pre-eclampsia. Immediate clinical evaluation recommended.",
-  },
-  {
-    type: "moderate" as const,
-    icon: Info,
-    text: "Fasting glucose of 126 mg/dL is borderline. A 75g OGTT is advised to rule out gestational diabetes.",
-  },
-  {
-    type: "low" as const,
-    icon: CheckCircle,
-    text: "Hemoglobin and fetal heart rate are within acceptable range. Continue standard monitoring schedule.",
-  },
-];
+// ── Helpers ───────────────────────────────────────────────────────────
+type RiskLevel = "low" | "moderate" | "high";
+
+function bpRiskLevel(sbp: number, dbp: number): RiskLevel {
+  if (sbp >= 140 || dbp >= 90) return "high";
+  if (sbp >= 130 || dbp >= 85) return "moderate";
+  return "low";
+}
+
+function glucoseRiskLevel(v: number): RiskLevel {
+  if (v >= 140) return "high";
+  if (v >= 110) return "moderate";
+  return "low";
+}
+
+function bmiRiskLevel(v: number): RiskLevel {
+  if (v >= 35) return "high";
+  if (v >= 30 || v < 18.5) return "moderate";
+  return "low";
+}
+
+function hbRiskLevel(v: number): RiskLevel {
+  if (v < 10) return "high";
+  if (v < 11) return "moderate";
+  return "low";
+}
+
+function proteinRiskLevel(p: string): RiskLevel {
+  const map: Record<string, RiskLevel> = {
+    "4+": "high",
+    "3+": "high",
+    "2+": "high",
+    "1+": "moderate",
+    trace: "low",
+    negative: "low",
+  };
+  return map[p?.toLowerCase()] ?? "low";
+}
+
+function fhrRiskLevel(v: number): RiskLevel {
+  if (v < 110 || v > 160) return "high";
+  if (v < 120 || v > 155) return "moderate";
+  return "low";
+}
+
+function buildRecommendations(result: AnalysisResult) {
+  const { patientData: d, prediction, shap } = result;
+  const recs: { type: "high" | "moderate" | "low"; icon: React.ElementType; text: string }[] = [];
+
+  // Pre-eclampsia signal
+  const pKey = (d.urine_protein ?? "negative").toLowerCase();
+  const hasProtein = ["2+", "3+", "4+"].includes(pKey);
+  if ((d.sbp >= 140 || d.dbp >= 90) && hasProtein) {
+    recs.push({
+      type: "high",
+      icon: AlertTriangle,
+      text: `Elevated blood pressure (${d.sbp}/${d.dbp} mmHg) combined with proteinuria (${d.urine_protein}) indicates possible pre-eclampsia. Immediate obstetric evaluation is recommended.`,
+    });
+  } else if (d.sbp >= 160 || d.dbp >= 110) {
+    recs.push({
+      type: "high",
+      icon: AlertTriangle,
+      text: `Severely elevated blood pressure (${d.sbp}/${d.dbp} mmHg) requires urgent clinical attention to prevent complications.`,
+    });
+  }
+
+  // Anaemia
+  if (d.hemoglobin < 10) {
+    recs.push({
+      type: d.hemoglobin < 7 ? "high" : "moderate",
+      icon: d.hemoglobin < 7 ? AlertTriangle : Info,
+      text: `Haemoglobin of ${d.hemoglobin} g/dL indicates ${d.hemoglobin < 7 ? "severe" : "moderate"} anaemia. Iron supplementation and haematology review are advised.`,
+    });
+  }
+
+  // Glucose / GDM
+  if (d.blood_glucose >= 140) {
+    recs.push({
+      type: "moderate",
+      icon: Info,
+      text: `Fasting glucose of ${d.blood_glucose} mg/dL is elevated. A 75g OGTT is recommended to screen for gestational diabetes mellitus.`,
+    });
+  } else if (d.blood_glucose >= 110) {
+    recs.push({
+      type: "moderate",
+      icon: Info,
+      text: `Borderline fasting glucose (${d.blood_glucose} mg/dL). Dietary counselling and repeat glucose monitoring are suggested.`,
+    });
+  }
+
+  // Fetal position
+  const pos = (d.fetal_position ?? "").toLowerCase();
+  if (pos === "breech") {
+    recs.push({
+      type: "moderate",
+      icon: Info,
+      text: "Breech presentation detected. External cephalic version (ECV) or planned caesarean section should be discussed with the obstetric team.",
+    });
+  } else if (pos === "transverse" || pos === "oblique") {
+    recs.push({
+      type: "high",
+      icon: AlertTriangle,
+      text: `${pos.charAt(0).toUpperCase() + pos.slice(1)} fetal lie detected. This may require hospitalisation and planning for operative delivery.`,
+    });
+  }
+
+  // All-clear note
+  if (recs.length === 0) {
+    if (prediction === "Low Risk") {
+      recs.push({
+        type: "low",
+        icon: CheckCircle,
+        text: "All clinical markers are within acceptable ranges. Continue standard antenatal monitoring schedule.",
+      });
+    } else {
+      const topFactor = shap[0];
+      recs.push({
+        type: "moderate",
+        icon: Info,
+        text: `The primary concern is ${topFactor?.feature ?? "elevated risk markers"}. Please consult your healthcare provider for a detailed assessment.`,
+      });
+    }
+  }
+
+  // Final low-risk note if nothing normal was added
+  const hasLow = recs.some((r) => r.type === "low");
+  if (!hasLow && (d.hemoglobin >= 11 && d.fetal_heart_rate >= 110 && d.fetal_heart_rate <= 160)) {
+    recs.push({
+      type: "low",
+      icon: CheckCircle,
+      text: `Haemoglobin (${d.hemoglobin} g/dL) and fetal heart rate (${d.fetal_heart_rate} bpm) are within acceptable range. Continue standard monitoring.`,
+    });
+  }
+
+  return recs;
+}
 
 const typeConfig = {
   high: "border-red-500/30 bg-red-500/5 text-red-300",
@@ -101,7 +172,83 @@ const typeConfig = {
   low: "border-emerald-500/30 bg-emerald-500/5 text-emerald-300",
 };
 
+// ── Page ──────────────────────────────────────────────────────────────
 export default function ResultsPage() {
+  const [result, setResult] = useState<AnalysisResult>(fallbackResult);
+
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem("prenatalAnalysis");
+      if (raw) {
+        setResult(JSON.parse(raw) as AnalysisResult);
+      }
+    } catch {
+      // keep fallback
+    }
+  }, []);
+
+  const { patientData: d, shap, subRisks, prediction, probability, reasons } = result;
+  const score = Math.round(probability * 100);
+
+  const metrics = [
+    {
+      label: "Blood Pressure",
+      value: `${d.sbp}/${d.dbp}`,
+      unit: "mmHg",
+      normal: "< 120/80",
+      risk: bpRiskLevel(d.sbp, d.dbp),
+      icon: Activity,
+      delay: 0,
+    },
+    {
+      label: "Blood Glucose",
+      value: d.blood_glucose,
+      unit: "mg/dL",
+      normal: "70–99",
+      risk: glucoseRiskLevel(d.blood_glucose),
+      icon: Droplets,
+      delay: 0.06,
+    },
+    {
+      label: "BMI",
+      value: d.bmi,
+      unit: "kg/m²",
+      normal: "18.5–24.9",
+      risk: bmiRiskLevel(d.bmi),
+      icon: Weight,
+      delay: 0.12,
+    },
+    {
+      label: "Hemoglobin",
+      value: d.hemoglobin,
+      unit: "g/dL",
+      normal: "> 11.0",
+      risk: hbRiskLevel(d.hemoglobin),
+      icon: Thermometer,
+      delay: 0.18,
+    },
+    {
+      label: "Urine Protein",
+      value: d.urine_protein ?? "—",
+      unit: "",
+      normal: "Negative",
+      risk: proteinRiskLevel(d.urine_protein),
+      icon: TestTube,
+      delay: 0.24,
+    },
+    {
+      label: "Fetal Heart Rate",
+      value: d.fetal_heart_rate,
+      unit: "bpm",
+      normal: "110–160",
+      risk: fhrRiskLevel(d.fetal_heart_rate),
+      icon: Heart,
+      delay: 0.3,
+    },
+  ] as const;
+
+  const recommendations = buildRecommendations(result);
+
   return (
     <main className="relative min-h-screen bg-[#050810] overflow-hidden">
       <Navbar />
@@ -132,8 +279,16 @@ export default function ResultsPage() {
               <h1 className="text-3xl font-bold text-white mb-2">
                 Prenatal Risk <span className="gradient-text">Report</span>
               </h1>
-              <p className="text-slate-500 text-sm">
-                Generated on {new Date().toLocaleDateString("en-US", {
+              <p className="text-slate-500 text-sm flex items-center gap-2">
+                {d.name && (
+                  <>
+                    <User size={13} className="text-slate-600" />
+                    <span className="text-slate-400">{d.name}</span>
+                    <span className="text-slate-700">·</span>
+                  </>
+                )}
+                Generated on{" "}
+                {new Date().toLocaleDateString("en-US", {
                   day: "numeric",
                   month: "long",
                   year: "numeric",
@@ -152,9 +307,12 @@ export default function ResultsPage() {
             </div>
           </motion.div>
 
+          {/* ── Reason for Referral (PROMINENT) ── */}
+          <ReasonCard reasons={reasons} prediction={prediction} />
+
           {/* Overall Risk + Charts */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-            {/* Overall Score Card */}
+            {/* Score card */}
             <motion.div
               initial={{ opacity: 0, y: 24 }}
               animate={{ opacity: 1, y: 0 }}
@@ -164,12 +322,15 @@ export default function ResultsPage() {
               <p className="text-slate-400 text-sm mb-6 uppercase tracking-widest text-center">
                 Overall Risk Score
               </p>
-              <RiskGauge score={67} label="Based on 7 clinical markers" />
+              <RiskGauge
+                score={score}
+                label={`Based on ${shap.length} clinical markers`}
+              />
               <div className="mt-6 w-full space-y-2">
                 {[
-                  { label: "Pre-eclampsia Risk", pct: 72 },
-                  { label: "GDM Risk", pct: 48 },
-                  { label: "Preterm Risk", pct: 31 },
+                  { label: "Pre-eclampsia Risk", pct: subRisks.preEclampsia },
+                  { label: "GDM Risk", pct: subRisks.gdm },
+                  { label: "Preterm Risk", pct: subRisks.preterm },
                 ].map(({ label, pct }) => (
                   <div key={label}>
                     <div className="flex justify-between text-xs mb-1">
@@ -199,12 +360,12 @@ export default function ResultsPage() {
 
             {/* Charts */}
             <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-6">
-              <RiskRadar />
-              <RiskBarChart />
+              <RiskRadar shap={shap} />
+              <RiskBarChart shap={shap} />
             </div>
           </div>
 
-          {/* Metric Cards */}
+          {/* Clinical Markers */}
           <motion.h2
             initial={{ opacity: 0 }}
             whileInView={{ opacity: 1 }}
@@ -219,6 +380,32 @@ export default function ResultsPage() {
               <MetricCard key={m.label} {...m} />
             ))}
           </div>
+
+          {/* Patient info strip */}
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5 }}
+            className="glass rounded-xl border border-white/5 p-5 mb-8 grid grid-cols-2 sm:grid-cols-4 gap-4"
+          >
+            {[
+              { label: "Age", value: `${d.age} yrs` },
+              { label: "Gestational Age", value: `${d.gestational_age} wks` },
+              { label: "Parity", value: d.parity },
+              {
+                label: "Fetal Position",
+                value:
+                  (d.fetal_position ?? "—").charAt(0).toUpperCase() +
+                  (d.fetal_position ?? "").slice(1),
+              },
+            ].map(({ label, value }) => (
+              <div key={label} className="text-center">
+                <p className="text-slate-600 text-xs mb-1">{label}</p>
+                <p className="text-white font-semibold text-sm">{value}</p>
+              </div>
+            ))}
+          </motion.div>
 
           {/* Recommendations */}
           <motion.div
@@ -255,8 +442,9 @@ export default function ResultsPage() {
             transition={{ duration: 0.5 }}
             className="text-slate-600 text-xs text-center mt-8"
           >
-            This AI analysis is for informational purposes only and does not constitute medical advice.
-            Always consult a qualified healthcare professional for diagnosis and treatment.
+            This AI analysis is for informational purposes only and does not
+            constitute medical advice. Always consult a qualified healthcare
+            professional for diagnosis and treatment.
           </motion.p>
         </div>
       </div>
