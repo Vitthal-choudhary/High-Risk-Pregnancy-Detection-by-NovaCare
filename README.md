@@ -8,6 +8,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue?style=for-the-badge&logo=typescript)](https://typescriptlang.org)
 [![CatBoost](https://img.shields.io/badge/CatBoost-Referral%20Model-yellow?style=for-the-badge)](https://catboost.ai)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-CSS%204-38bdf8?style=for-the-badge&logo=tailwindcss)](https://tailwindcss.com)
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-prenatal--psi.vercel.app-brightgreen?style=for-the-badge&logo=vercel)](https://prenatal-psi.vercel.app/)
 
 > **Empowering clinicians with interpretable, real-time pregnancy risk assessment — because every second counts in maternal healthcare.**
 
