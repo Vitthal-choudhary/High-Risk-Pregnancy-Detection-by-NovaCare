@@ -237,7 +237,6 @@ High-Risk-Pregnancy-Detection-by-NovaCare/
 ├── sample_high_risk_report.pdf          # Test patient — high risk
 ├── sample_moderate_risk_report.pdf      # Test patient — moderate risk
 ├── sample_low_risk_report.pdf           # Test patient — low risk
-├── main.pdf                             # Full research documentation
 └── README.md
 ```
 
