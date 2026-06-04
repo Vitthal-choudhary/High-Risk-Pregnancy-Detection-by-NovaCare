@@ -68,7 +68,7 @@ The model also predicts three specific comorbidity risks in parallel:
 
 - **Pre-eclampsia (PE)** — driven by blood pressure, proteinuria, gestational age
 - **Gestational Diabetes Mellitus (GDM)** — driven by fasting glucose and BMI
-- **Preterm Delivery (PTD)** — correlated with overall risk level and gestational age
+- **Preterm Delivery (PTD)** — correlated with overall risk level and gestational age.
 
 ---
 
@@ -146,7 +146,7 @@ A polished, production-ready **Next.js** dashboard for clinicians.
 |---|---|
 | **Landing** | Hero section, feature highlights, how-it-works walkthrough |
 | **Upload** | Drag-and-drop zone, file format hints, sample data option |
-| **Results** | Animated risk gauge, per-metric cards with status badges, radar chart for sub-risks, contribution chart, and action recommendations |
+| **Results** | Animated risk gauge, per-metric cards with status badges, radar chart for sub-risks, contribution chart, and action recommendations. |
 
 ---
 
