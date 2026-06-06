@@ -61,7 +61,7 @@ CatBoost handles **categorical features natively** (e.g., fetal position, urine 
 |---|---|---|
 | 🔴 **High Risk** | > 65% | Immediate specialist referral |
 | 🟡 **Moderate Risk** | 35% – 65% | Enhanced monitoring |
-| 🟢 **Low Risk** | < 35% | Routine prenatal care |
+| 🟢 **Low Risk** | < 35% | Routine prenatal care. |
 
 ### Sub-Risk Assessments
 The model also predicts three specific comorbidity risks in parallel:
